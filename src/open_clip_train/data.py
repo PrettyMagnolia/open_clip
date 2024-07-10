@@ -330,6 +330,12 @@ def get_wds_dataset(args, preprocess_img, is_train, epoch=0, floor=False, tokeni
     assert input_shards is not None
     resampled = getattr(args, 'dataset_resampled', False) and is_train
 
+    # 过滤掉非 .tar 文件
+    if isinstance(input_shards, str):
+        input_shards = [os.path.join(input_shards, f) for f in os.listdir(input_shards) if f.endswith('.tar')]
+    else:
+        input_shards = [f for f in input_shards if f.endswith('.tar')]
+
     num_shards = None
     if is_train:
         if args.train_num_samples is not None:
