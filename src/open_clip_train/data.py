@@ -1,6 +1,7 @@
 import ast
 import json
 import logging
+import random
 import math
 import os
 import random
@@ -27,12 +28,12 @@ except ImportError:
 
 
 class CsvDataset(Dataset):
-    def __init__(self, input_filename, transforms, img_key, caption_key, sep="\t", tokenizer=None):
+    def __init__(self, input_filename,  transforms, images_path, img_key, caption_key, sep="\t", tokenizer=None):
         logging.debug(f'Loading csv data from {input_filename}.')
         df = pd.read_csv(input_filename, sep=sep)
-
+        self.images_path = images_path
         self.images = df[img_key].tolist()
-        self.captions = df[caption_key].tolist()
+        self.captions = df[caption_key].apply(ast.literal_eval).tolist()
         self.transforms = transforms
         logging.debug('Done loading data.')
 
@@ -42,8 +43,13 @@ class CsvDataset(Dataset):
         return len(self.captions)
 
     def __getitem__(self, idx):
-        images = self.transforms(Image.open(str(self.images[idx])))
-        texts = self.tokenize([str(self.captions[idx])])[0]
+        images = self.transforms(Image.open(self.images_path + str(self.images[idx])))
+        if isinstance(self.captions[idx], list):
+            # Pick a random one from the caption list
+            caption = random.choice(self.captions[idx])
+            texts = self.tokenize(caption)[0]
+        else:
+            texts = self.tokenize([str(self.captions[idx])])[0]
         return images, texts
 
 
@@ -455,6 +461,7 @@ def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     dataset = CsvDataset(
         input_filename,
         preprocess_fn,
+        images_path=args.csv_img_path,
         img_key=args.csv_img_key,
         caption_key=args.csv_caption_key,
         sep=args.csv_separator,

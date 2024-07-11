@@ -78,6 +78,12 @@ def parse_args(args):
         help="For csv-like datasets, which separator to use."
     )
     parser.add_argument(
+        "--csv-img-path",
+        type=str,
+        default=None,
+        help="For csv-like datasets, the image paths."
+    )
+    parser.add_argument(
         "--csv-img-key",
         type=str,
         default="filepath",
