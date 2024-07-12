@@ -61,7 +61,7 @@ def parse_args(args):
     )
     parser.add_argument(
         "--dataset-type",
-        choices=["webdataset", "csv", "synthetic", "auto"],
+        choices=["webdataset", "coconut", "csv", "synthetic", "auto"],
         default="auto",
         help="Which type of dataset to process."
     )
@@ -78,10 +78,22 @@ def parse_args(args):
         help="For csv-like datasets, which separator to use."
     )
     parser.add_argument(
-        "--csv-img-path",
+        "--coconut-path",
         type=str,
         default=None,
-        help="For csv-like datasets, the image paths."
+        help="Path of coconut"
+    )
+    parser.add_argument(
+        "--panoptic-path",
+        type=str,
+        default=None,
+        help="Path of images panoptic set"
+    )
+    parser.add_argument(
+        "--img-path",
+        type=str,
+        default=None,
+        help="Path of images set"
     )
     parser.add_argument(
         "--csv-img-key",

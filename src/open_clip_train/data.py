@@ -21,6 +21,9 @@ from torch.utils.data.distributed import DistributedSampler
 from webdataset.filters import _shuffle
 from webdataset.tariterators import base_plus_ext, url_opener, tar_file_expander, valid_sample
 
+import matplotlib.pyplot as plt
+from panopticapi.utils import rgb2id
+
 try:
     import horovod.torch as hvd
 except ImportError:
@@ -51,6 +54,63 @@ class CsvDataset(Dataset):
         else:
             texts = self.tokenize([str(self.captions[idx])])[0]
         return images, texts
+
+
+class CocoNutDataset(Dataset):
+    def __init__(self, input_filename, transforms, images_path, coconut_path, panoptic_path, tokenizer=None):
+        logging.debug(f'Loading json data from {input_filename}.')
+        coco = json.load(open(input_filename, 'r'))
+        self.coco_df = pd.DataFrame(coco['annotations'])
+
+        coconut = json.load(open(coconut_path, 'r'))
+        self.categories_df = pd.json_normalize(coconut, 'categories')
+        self.segments_df = pd.json_normalize(coconut, 'annotations')
+
+        self.images_path = images_path
+        self.panoptic_path = panoptic_path
+        self.images = self.segments_df["file_name"].tolist()
+        self.transforms = transforms
+        logging.debug('Done loading data.')
+
+        self.tokenize = tokenizer
+
+    def __len__(self):
+        return len(self.images)
+
+    def visualize_segment_by_id(self, image, panoptic_seg, segment_id):
+        mask = panoptic_seg == segment_id
+
+        plt.figure(figsize=(10, 10))
+        plt.subplot(1, 2, 1)
+        plt.imshow(image)
+        plt.title("Original Image")
+        plt.axis('off')
+
+        masked_image = np.array(image) * np.expand_dims(mask, axis=2)
+        plt.subplot(1, 2, 2)
+        plt.imshow(masked_image)
+        plt.title(f"Segment ID: {segment_id}")
+        plt.axis('off')
+
+        plt.show()
+
+    def get_captions_for_image(self, image_name, df):
+        name, _ = os.path.splitext(image_name)
+        return df[df['image_id'] == int(name)]['caption'].tolist()
+
+    def __getitem__(self, idx):
+        captions = self.get_captions_for_image(str(self.images[idx]), self.coco_df)
+        images = self.transforms(Image.open(self.images_path + str(self.images[idx]).replace('png','jpg')))
+        image_panoptic_path = self.panoptic_path + str(self.images[idx])
+
+        # load panoptic mask
+        panoptic_orig = np.asarray(Image.open(image_panoptic_path), dtype=np.uint32)
+        panoptic_seg = rgb2id(panoptic_orig).astype(np.int32)
+
+        self.visualize_segment_by_id(Image.open(self.images_path + str(self.images[idx]).replace('png','jpg')), panoptic_seg, 4)
+
+        texts = self.tokenize([str(captions[0])])[0]
+        return texts, images, panoptic_seg
 
 
 class SharedEpoch:
@@ -461,7 +521,7 @@ def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     dataset = CsvDataset(
         input_filename,
         preprocess_fn,
-        images_path=args.csv_img_path,
+        images_path=args.img_path,
         img_key=args.csv_img_key,
         caption_key=args.csv_caption_key,
         sep=args.csv_separator,
@@ -485,6 +545,34 @@ def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
 
     return DataInfo(dataloader, sampler)
 
+def get_coconut_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
+    input_filename = args.train_data if is_train else args.val_data
+    assert input_filename
+    dataset = CocoNutDataset(
+        input_filename,
+        preprocess_fn,
+        images_path=args.img_path,
+        coconut_path=args.coconut_path,
+        panoptic_path=args.panoptic_path,
+        tokenizer=tokenizer
+    )
+    num_samples = len(dataset)
+    sampler = DistributedSampler(dataset) if args.distributed and is_train else None
+    shuffle = is_train and sampler is None
+
+    dataloader = DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        shuffle=shuffle,
+        num_workers=args.workers,
+        pin_memory=True,
+        sampler=sampler,
+        drop_last=is_train,
+    )
+    dataloader.num_samples = num_samples
+    dataloader.num_batches = len(dataloader)
+
+    return DataInfo(dataloader, sampler)
 
 class SyntheticDataset(Dataset):
 
@@ -541,6 +629,8 @@ def get_dataset_fn(data_path, dataset_type):
         return get_wds_dataset
     elif dataset_type == "csv":
         return get_csv_dataset
+    elif dataset_type == "coconut":
+        return get_coconut_dataset
     elif dataset_type == "synthetic":
         return get_synthetic_dataset
     elif dataset_type == "auto":
