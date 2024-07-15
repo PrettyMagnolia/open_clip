@@ -107,11 +107,11 @@ class CocoNutDataset(Dataset):
         panoptic_orig = np.asarray(Image.open(image_panoptic_path), dtype=np.uint32)
         panoptic_seg = rgb2id(panoptic_orig).astype(np.int32)
 
-        self.visualize_segment_by_id(Image.open(self.images_path + str(self.images[idx]).replace('png','jpg')), panoptic_seg, 4)
+        # self.visualize_segment_by_id(Image.open(self.images_path + str(self.images[idx]).replace('png','jpg')), panoptic_seg, 4)
 
         texts = self.tokenize([str(captions[0])])[0]
-        return texts, images, panoptic_seg
-
+        # return texts, images, panoptic_seg
+        return images, texts
 
 class SharedEpoch:
     def __init__(self, epoch: int = 0):
