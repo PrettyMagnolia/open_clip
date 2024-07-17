@@ -90,7 +90,13 @@ def parse_args(args):
         help="Path of images panoptic set"
     )
     parser.add_argument(
-        "--img-path",
+        "--train-img-path",
+        type=str,
+        default=None,
+        help="Path of images set"
+    )
+    parser.add_argument(
+        "--val-img-path",
         type=str,
         default=None,
         help="Path of images set"
@@ -142,6 +148,12 @@ def parse_args(args):
     )
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size per GPU."
+    )
+    parser.add_argument(
+        "--train-batch-size", type=int, default=64, help="Batch size per GPU."
+    )
+    parser.add_argument(
+        "--val-batch-size", type=int, default=64, help="Batch size per GPU."
     )
     parser.add_argument(
         "--epochs", type=int, default=32, help="Number of epochs to train for."

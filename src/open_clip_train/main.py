@@ -91,6 +91,7 @@ def main(args):
             # sync date_str from master to all ranks
             date_str = broadcast_object(args, date_str)
         args.name = '-'.join([
+            'coconut',
             date_str,
             f"model_{model_name_safe}",
             f"lr_{args.lr}",

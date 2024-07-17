@@ -31,7 +31,7 @@ except ImportError:
 
 
 class CsvDataset(Dataset):
-    def __init__(self, input_filename,  transforms, images_path, img_key, caption_key, sep="\t", tokenizer=None):
+    def __init__(self, input_filename, transforms, images_path, img_key, caption_key, sep="\t", tokenizer=None):
         logging.debug(f'Loading csv data from {input_filename}.')
         df = pd.read_csv(input_filename, sep=sep)
         self.images_path = images_path
@@ -62,13 +62,18 @@ class CocoNutDataset(Dataset):
         coco = json.load(open(input_filename, 'r'))
         self.coco_df = pd.DataFrame(coco['annotations'])
 
-        coconut = json.load(open(coconut_path, 'r'))
-        self.categories_df = pd.json_normalize(coconut, 'categories')
-        self.segments_df = pd.json_normalize(coconut, 'annotations')
+        # coconut = json.load(open(coconut_path, 'r'))
+        # self.categories_df = pd.json_normalize(coconut, 'categories')
+        # self.segments_df = pd.json_normalize(coconut, 'annotations')
 
         self.images_path = images_path
         self.panoptic_path = panoptic_path
-        self.images = self.segments_df["file_name"].tolist()
+        # self.images = self.segments_df["file_name"].tolist()
+        self.images = []
+        for root, dirs, files in os.walk(images_path):
+            for file in files:
+                if file.endswith('.jpg') or file.endswith('.png') or file.endswith('.jpeg') or file.endswith('.webp'):
+                    self.images.append(file)
         self.transforms = transforms
         logging.debug('Done loading data.')
 
@@ -100,18 +105,19 @@ class CocoNutDataset(Dataset):
 
     def __getitem__(self, idx):
         captions = self.get_captions_for_image(str(self.images[idx]), self.coco_df)
-        images = self.transforms(Image.open(self.images_path + str(self.images[idx]).replace('png','jpg')))
-        image_panoptic_path = self.panoptic_path + str(self.images[idx])
+        images = self.transforms(Image.open(self.images_path + str(self.images[idx]).replace('png', 'jpg')))
+        # image_panoptic_path = self.panoptic_path + str(self.images[idx])
 
         # load panoptic mask
-        panoptic_orig = np.asarray(Image.open(image_panoptic_path), dtype=np.uint32)
-        panoptic_seg = rgb2id(panoptic_orig).astype(np.int32)
+        # panoptic_orig = np.asarray(Image.open(image_panoptic_path), dtype=np.uint32)
+        # panoptic_seg = rgb2id(panoptic_orig).astype(np.int32)
 
         # self.visualize_segment_by_id(Image.open(self.images_path + str(self.images[idx]).replace('png','jpg')), panoptic_seg, 4)
 
         texts = self.tokenize([str(captions[0])])[0]
         # return texts, images, panoptic_seg
         return images, texts
+
 
 class SharedEpoch:
     def __init__(self, epoch: int = 0):
@@ -144,7 +150,7 @@ def expand_urls(urls, weights=None):
     if isinstance(urls, str):
         urllist = urls.split("::")
         weights = weights.split('::')
-        assert len(weights) == len(urllist),\
+        assert len(weights) == len(urllist), \
             f"Expected the number of data components ({len(urllist)}) and weights({len(weights)}) to match."
         weights = [float(weight) for weight in weights]
         all_urls, all_weights = [], []
@@ -341,13 +347,13 @@ class ResampledShards2(IterableDataset):
     """An iterable dataset yielding a list of urls."""
 
     def __init__(
-        self,
-        urls,
-        weights=None,
-        nshards=sys.maxsize,
-        worker_seed=None,
-        deterministic=False,
-        epoch=-1,
+            self,
+            urls,
+            weights=None,
+            nshards=sys.maxsize,
+            worker_seed=None,
+            deterministic=False,
+            epoch=-1,
     ):
         """Sample shards from the shard list with replacement.
 
@@ -358,7 +364,7 @@ class ResampledShards2(IterableDataset):
         self.urls = urls
         self.weights = weights
         if self.weights is not None:
-            assert len(self.urls) == len(self.weights),\
+            assert len(self.urls) == len(self.weights), \
                 f"Number of urls {len(self.urls)} and weights {len(self.weights)} should match."
         assert isinstance(self.urls[0], str)
         self.nshards = nshards
@@ -414,13 +420,13 @@ def get_wds_dataset(args, preprocess_img, is_train, epoch=0, floor=False, tokeni
                     'Please specify it via `--train-num-samples` if no dataset length info is present.')
     else:
         # Eval will just exhaust the iterator if the size is not specified.
-        num_samples = args.val_num_samples or 0 
+        num_samples = args.val_num_samples or 0
 
     shared_epoch = SharedEpoch(epoch=epoch)  # create a shared epoch store to sync epoch to dataloader worker proc
 
     if is_train and args.train_data_upsampling_factors is not None:
         assert resampled, "--train_data_upsampling_factors is only supported when sampling with replacement (with --dataset-resampled)."
-    
+
     if resampled:
         pipeline = [ResampledShards2(
             input_shards,
@@ -545,13 +551,15 @@ def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
 
     return DataInfo(dataloader, sampler)
 
+
 def get_coconut_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     input_filename = args.train_data if is_train else args.val_data
+    img_path = args.train_img_path if is_train else args.val_img_path
     assert input_filename
     dataset = CocoNutDataset(
         input_filename,
         preprocess_fn,
-        images_path=args.img_path,
+        images_path=img_path,
         coconut_path=args.coconut_path,
         panoptic_path=args.panoptic_path,
         tokenizer=tokenizer
@@ -559,10 +567,11 @@ def get_coconut_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     num_samples = len(dataset)
     sampler = DistributedSampler(dataset) if args.distributed and is_train else None
     shuffle = is_train and sampler is None
+    batch_size = args.train_batch_size if is_train else args.val_batch_size
 
     dataloader = DataLoader(
         dataset,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=shuffle,
         num_workers=args.workers,
         pin_memory=True,
@@ -573,6 +582,7 @@ def get_coconut_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     dataloader.num_batches = len(dataloader)
 
     return DataInfo(dataloader, sampler)
+
 
 class SyntheticDataset(Dataset):
 
@@ -644,7 +654,7 @@ def get_dataset_fn(data_path, dataset_type):
                 f"Tried to figure out dataset type, but failed for extension {ext}.")
     else:
         raise ValueError(f"Unsupported dataset type: {dataset_type}")
-    
+
 
 def get_data(args, preprocess_fns, epoch=0, tokenizer=None):
     preprocess_train, preprocess_val = preprocess_fns
