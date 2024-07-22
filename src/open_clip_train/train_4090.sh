@@ -1,0 +1,22 @@
+# 4090
+/home/yifei/miniconda3/bin/conda run -n ai --no-capture-output python /home/yifei/code/open_clip/src/open_clip_train/main.py \
+  --save-frequency 1 \
+  --zeroshot-frequency 1 \
+  --report-to wandb \
+  --wandb-project-name "open-clip" \
+  --dataset-type coconut \
+  --train-data "/mnt/shared/coco/coco_2017/Annotations/annotations_2017/captions_train2017.json" \
+  --train-img-path "/mnt/shared/coco/coco_2017/Images/train2017/" \
+  --val-data "/mnt/shared/coco/coco_2017/Annotations/annotations_2017/captions_val2017.json" \
+  --val-img-path "/mnt/shared/coco/coco_2017/Images/val2017/" \
+  --coconut-path "/mnt/shared/coconut/annotations/coconut_s_panoptic_with_captions.json" \
+  --panoptic-path "/mnt/shared/coconut/coconut_s/panoptic/" \
+  --warmup 10000 \
+  --train-batch-size 512 \
+  --val-batch-size 256 \
+  --lr 1e-5 \
+  --wd 0.1 \
+  --epochs 30 \
+  --workers 4 \
+  --model ViT-B-32 \
+  --pretrained "/mnt/shared/models/CLIP-ViT-B-32-laion2B-s34B-b79K/open_clip_pytorch_model.bin"

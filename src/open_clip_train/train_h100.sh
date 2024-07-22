@@ -1,0 +1,22 @@
+# H100
+python train.py \
+  --save-frequency 1 \
+  --zeroshot-frequency 1 \
+  --report-to wandb \
+  --wandb-project-name "open-clip" \
+  --dataset-type coconut \
+  --train-data "/mnt/shared/data/coco/annotations/annotations_2017/captions_train2017.json" \
+  --train-img-path "/mnt/shared/data/coco/images/train2017/" \
+  --val-data "/mnt/shared/data/coco/annotations/annotations_2017/captions_val2017.json" \
+  --val-img-path "/mnt/shared/data/coco/images/val2017/" \
+  --coconut-path "/mnt/shared/data/coconut/annotations/coconut_s_panoptic.json" \
+  --panoptic-path "/mnt/shared/data/coconut/coconut_s/panoptic/" \
+  --warmup 10000 \
+  --train-batch-size 1024 \
+  --val-batch-size 256 \
+  --lr 1e-3 \
+  --wd 0.1 \
+  --epochs 30 \
+  --workers 4 \
+  --model ViT-B-32 \
+  --pretrained "/mnt/shared/models/open_clip/CLIP-ViT-B-32-laion2B-s34B-b79K/open_clip_pytorch_model.bin"

@@ -22,7 +22,7 @@ from webdataset.filters import _shuffle
 from webdataset.tariterators import base_plus_ext, url_opener, tar_file_expander, valid_sample
 
 import matplotlib.pyplot as plt
-from panopticapi.utils import rgb2id
+# from panopticapi.utils import rgb2id
 
 try:
     import horovod.torch as hvd
